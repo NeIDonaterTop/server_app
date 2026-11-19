@@ -23,4 +23,4 @@ app.include_router(health_router)
 
 if __name__ == "__main__":
     print(f"Запуск {config.app_name} на http://localhost:{config.http_port} (Окружение: {config.app_env})")
-    uvicorn.run(app, host="127.0.0.1", port=config.http_port)
+    uvicorn.run(app, host="0.0.0.0", port=config.http_port)
