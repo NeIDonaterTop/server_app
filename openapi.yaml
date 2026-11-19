@@ -1,0 +1,493 @@
+openapi: 3.0.3
+info:
+  title: UptimePulse REST API
+  description: Спецификация REST API для сервиса мониторинга доступности сайтов (Лабораторная работа №2, Вариант 23)
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Локальный сервер разработки
+
+paths:
+  /auth/register:
+    post:
+      summary: Регистрация нового пользователя
+      tags:
+        - Аутентификация
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Пользователь успешно зарегистрирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Некорректные данные или email уже занят
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      summary: Вход в систему и получение JWT токена
+      tags:
+        - Аутентификация
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешная аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Неверный email или пароль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /monitors:
+    get:
+      summary: Получение списка сайтов текущего пользователя
+      tags:
+        - Мониторы сайтов
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: is_active
+          in: query
+          required: false
+          description: Фильтр по статусу активности монитора
+          schema:
+            type: boolean
+            example: true
+      responses:
+        '200':
+          description: Список мониторов успешно получен
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MonitorResponse'
+        '401':
+          description: Пользователь не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      summary: Добавление нового сайта на мониторинг
+      tags:
+        - Мониторы сайтов
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMonitorRequest'
+      responses:
+        '201':
+          description: Сайт успешно добавлен в мониторинг
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonitorResponse'
+        '400':
+          description: Ошибка валидации данных (некорректный URL или интервал)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Пользователь не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /monitors/{id}:
+    get:
+      summary: Получение информации о конкретном сайте по ID
+      tags:
+        - Мониторы сайтов
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Уникальный ID монитора
+          schema:
+            type: integer
+            example: 10
+      responses:
+        '200':
+          description: Информация о мониторе найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonitorResponse'
+        '401':
+          description: Пользователь не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Монитор с указанным ID не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Удаление сайта из мониторинга
+      tags:
+        - Мониторы сайтов
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Уникальный ID монитора
+          schema:
+            type: integer
+            example: 10
+      responses:
+        '204':
+          description: Монитор успешно удален (тело ответа пустое)
+        '401':
+          description: Пользователь не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Монитор с указанным ID не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /monitors/{id}/logs:
+    get:
+      summary: Получение истории замеров пинга и доступности для графиков
+      tags:
+        - Логи и статистика
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Уникальный ID монитора
+          schema:
+            type: integer
+            example: 10
+        - name: limit
+          in: query
+          required: false
+          description: Количество последних замеров
+          schema:
+            type: integer
+            default: 50
+            example: 50
+      responses:
+        '200':
+          description: История замеров успешно получена
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CheckLogResponse'
+        '401':
+          description: Пользователь не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Монитор не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /monitors/{id}/incidents:
+    get:
+      summary: Получение списка аварий и сбоев по конкретному сайту
+      tags:
+        - Инциденты
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Уникальный ID монитора
+          schema:
+            type: integer
+            example: 10
+        - name: status
+          in: query
+          required: false
+          description: Фильтр по статусу инцидента
+          schema:
+            type: string
+            enum: [OPEN, RESOLVED]
+            example: OPEN
+      responses:
+        '200':
+          description: Список инцидентов успешно получен
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IncidentResponse'
+        '401':
+          description: Пользователь не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Монитор не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: ivan@mail.ru
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: securePass123!
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: ivan@mail.ru
+        password:
+          type: string
+          format: password
+          example: securePass123!
+
+    TokenResponse:
+      type: object
+      required:
+        - access_token
+        - token_type
+      properties:
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        token_type:
+          type: string
+          example: bearer
+
+    UserResponse:
+      type: object
+      required:
+        - id
+        - email
+        - role
+        - created_at
+      properties:
+        id:
+          type: integer
+          example: 42
+        email:
+          type: string
+          format: email
+          example: ivan@mail.ru
+        role:
+          type: string
+          example: client
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-11-19T10:15:00Z'
+
+    CreateMonitorRequest:
+      type: object
+      required:
+        - name
+        - url
+        - interval_seconds
+        - timeout_seconds
+      properties:
+        name:
+          type: string
+          example: Мой интернет-магазин
+        url:
+          type: string
+          format: uri
+          example: https://myshop.ru/health
+        interval_seconds:
+          type: integer
+          minimum: 10
+          default: 60
+          example: 60
+        timeout_seconds:
+          type: integer
+          minimum: 1
+          maximum: 60
+          default: 5
+          example: 5
+
+    MonitorResponse:
+      type: object
+      required:
+        - id
+        - user_id
+        - name
+        - url
+        - interval_seconds
+        - timeout_seconds
+        - is_active
+      properties:
+        id:
+          type: integer
+          example: 10
+        user_id:
+          type: integer
+          example: 42
+        name:
+          type: string
+          example: Мой интернет-магазин
+        url:
+          type: string
+          example: https://myshop.ru/health
+        interval_seconds:
+          type: integer
+          example: 60
+        timeout_seconds:
+          type: integer
+          example: 5
+        is_active:
+          type: boolean
+          example: true
+
+    CheckLogResponse:
+      type: object
+      required:
+        - id
+        - monitor_id
+        - response_time_ms
+        - is_success
+        - checked_at
+      properties:
+        id:
+          type: integer
+          example: 1001
+        monitor_id:
+          type: integer
+          example: 10
+        status_code:
+          type: integer
+          nullable: true
+          example: 200
+        response_time_ms:
+          type: integer
+          example: 45
+        is_success:
+          type: boolean
+          example: true
+        checked_at:
+          type: string
+          format: date-time
+          example: '2026-11-19T11:20:00Z'
+
+    IncidentResponse:
+      type: object
+      required:
+        - id
+        - monitor_id
+        - started_at
+        - status
+      properties:
+        id:
+          type: integer
+          example: 5
+        monitor_id:
+          type: integer
+          example: 10
+        started_at:
+          type: string
+          format: date-time
+          example: '2026-11-19T11:00:00Z'
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-11-19T11:15:00Z'
+        status:
+          type: string
+          enum: [OPEN, RESOLVED]
+          example: RESOLVED
+        error_reason:
+          type: string
+          nullable: true
+          example: 'Connection Timeout > 5000ms'
+
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+        - timestamp
+      properties:
+        code:
+          type: string
+          example: INVALID_INPUT
+        message:
+          type: string
+          example: Поле interval_seconds должно быть не менее 10 секунд
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-11-19T11:25:00Z'
